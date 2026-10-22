@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: roomigo-mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: roomigo_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: roomigo
+      MYSQL_PASSWORD: roomigopassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - roomigo-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: roomigo-backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/roomigo_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata
+      SPRING_DATASOURCE_USERNAME: roomigo
+      SPRING_DATASOURCE_PASSWORD: roomigopassword
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      ROOMIGO_JWT_SECRET: c2VjdXJlLXN1cGVyLXNlY3JldC1qd3Qta2V5LXJvb21pZ28taHlkZXJhYmFkLTIwMjY=
+      ROOMIGO_UPLOAD_DIR: /app/uploads
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - roomigo-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: roomigo-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - roomigo-network
+
+volumes:
+  mysql_data:
+  uploads_data:
+
+networks:
+  roomigo-network:
+    driver: bridge
